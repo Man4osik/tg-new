@@ -1,16 +1,12 @@
-name: Build Telegram + BHTelegram (Sideloadly Ready)
+name: Build Telegram + AyuGram (Sideloadly Ready)
 
 on:
   workflow_dispatch:
     inputs:
       ipa_url:
-        description: 'URL to Decrypted Telegram / Swiftgram IPA'
+        description: 'URL к IPA (по умолчанию свежий AyuGram iOS)'
         required: false
-        default: 'https://github.com/Swiftgram/Telegram-iOS/releases/latest/download/Swiftgram.ipa'
-      bhtelegram_url:
-        description: 'URL to BHTelegram deb or dylib'
-        required: false
-        default: 'https://github.com/BandarHL/BHTelegram/releases/latest/download/com.bandarhl.bhtelegram.deb'
+        default: 'https://github.com/mapix3/AyuGram-iOS/releases/download/build-207501/AyuGram-standard-207501.ipa'
 
 jobs:
   build:
@@ -19,54 +15,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          brew install dpkg optool
-
       - name: Download Base IPA
         run: |
-          echo "Downloading Base IPA..."
-          curl -L -o base.ipa "${{ inputs.ipa_url }}" || curl -L -o base.ipa "https://github.com/Swiftgram/Telegram-iOS/releases/latest/download/Swiftgram.ipa"
+          echo "Скачиваем IPA по ссылке: ${{ inputs.ipa_url }}"
+          curl -L -o base.ipa "${{ inputs.ipa_url }}"
           unzip -q base.ipa -d app_extracted
 
-      - name: Download and extract BHTelegram
-        run: |
-          echo "Downloading BHTelegram tweak..."
-          curl -L -o bhtelegram.deb "${{ inputs.bhtelegram_url }}" || curl -L -o bhtelegram.deb "https://github.com/BandarHL/BHTelegram/releases/latest/download/com.bandarhl.bhtelegram.deb"
-          dpkg -x bhtelegram.deb bh_extracted/
-
-      - name: Inject Tweak & Optimize for Sideloadly
+      - name: Optimize for Sideloadly
         run: |
           APP_PATH=$(find app_extracted/Payload -maxdepth 1 -name "*.app")
-          APP_NAME=$(basename "$APP_PATH")
-          APP_BINARY="${APP_PATH}/${APP_NAME%.app}"
+          echo "Найдено приложение: $APP_PATH"
 
-          # 1. Вырезаем расширения (чтобы Sideloadly не ругался на лимиты Apple ID)
+          # 1. Удаляем расширения, чтобы бесплатный Apple ID в Sideloadly не выдавал ошибку "Max number of App IDs reached"
           if [ -d "$APP_PATH/PlugIns" ]; then
+            echo "Удаляем PlugIns для совместимости с бесплатным Apple ID..."
             rm -rf "$APP_PATH/PlugIns"
           fi
           if [ -d "$APP_PATH/Watch" ]; then
             rm -rf "$APP_PATH/Watch"
           fi
 
-          # 2. Внедряем твик
-          mkdir -p "$APP_PATH/Frameworks"
-          DYLIB_PATH=$(find bh_extracted -name "*.dylib" | head -n 1)
-          cp "$DYLIB_PATH" "$APP_PATH/Frameworks/BHTelegram.dylib"
-          find bh_extracted -name "*.bundle" -exec cp -R {} "$APP_PATH/" \;
-
-          # 3. Инжектим в бинарник
-          optool install -c load -p "@executable_path/Frameworks/BHTelegram.dylib" -t "$APP_BINARY"
-          codesign --force --deep --sign - "$APP_PATH/Frameworks/BHTelegram.dylib"
-
-          # 4. Пакуем готовый IPA
+          # 2. Пакуем готовый к установке IPA
           cd app_extracted
-          zip -qr ../Telegram_AyuBH_Sideloadly.ipa Payload
+          zip -qr ../Telegram_AyuGram_Sideloadly.ipa Payload
           cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Telegram_AyuBH_Sideloadly
-          path: Telegram_AyuBH_Sideloadly.ipa
+          name: Telegram_AyuGram_Sideloadly
+          path: Telegram_AyuGram_Sideloadly.ipa
           retention-days: 14
